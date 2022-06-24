@@ -9,7 +9,11 @@ namespace GeoCoordinateParser
 
         }
 
-
+        /// <summary>
+        /// Test if an already converted coordinate string is equivalent to the results of this conversion. Good to identifying errors in datasets with already existing decimal coordinates.
+        /// </summary>
+        /// <param name="coordsToTest">A string with decimalLatitude and decimalLongitude separated by a comma</param>
+        /// <returns>True if the tested coordinates are close enough (to six decimal places)</returns>
         public bool closeEnough(string coordsToTest)
         {
             if (coordsToTest.Contains(","))

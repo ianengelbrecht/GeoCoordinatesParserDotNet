@@ -8,10 +8,12 @@ namespace GeoCoordinateParser
     public class CoordinatesConverter
     {
 
-        
+        /// <summary>
+        /// Convert a coordinates string with any format to decimal coordinates
+        /// </summary>
         public static Coordinates convert(string coordsString)
         {
-            coordsString = Regex.Replace(coordsString, "\\s\\s+", " ");
+            coordsString = Regex.Replace(coordsString, "\\s+", " ");
 
             string ddLatStr = "";
             string ddLngStr = "";
@@ -84,22 +86,22 @@ namespace GeoCoordinateParser
                     {
                         if (!String.IsNullOrEmpty(matches[4]))
                         {
-                            latMins = double.Parse(matches[4]);
+                            latMins = double.Parse(matches[4].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[6]))
                         {
-                            latSecs = double.Parse(matches[6]);
+                            latSecs = double.Parse(matches[6].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[11]))
                         {
-                            lngMins = double.Parse(matches[11]);
+                            lngMins = double.Parse(matches[11].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[13]))
                         {
-                            lngSecs = double.Parse(matches[13]);
+                            lngSecs = double.Parse(matches[13].Replace(",", "."));
                         }
                     }
                     catch
@@ -126,6 +128,7 @@ namespace GeoCoordinateParser
                         latdir = matches[7];
                         lngdir = matches[14];
                     }
+                    
                 }
                 else
                 {
@@ -152,22 +155,22 @@ namespace GeoCoordinateParser
                     {
                         if (!String.IsNullOrEmpty(matches[4]))
                         {
-                            latMins = double.Parse(matches[4]);
+                            latMins = double.Parse(matches[4].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[6]))
                         {
-                            latSecs = double.Parse(matches[6]);
+                            latSecs = double.Parse(matches[6].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[12]))
                         {
-                            lngMins = double.Parse(matches[12]);
+                            lngMins = double.Parse(matches[12].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[14]))
                         {
-                            lngSecs = double.Parse(matches[14]);
+                            lngSecs = double.Parse(matches[14].Replace(",", "."));
                         }
                     }
                     catch
@@ -220,22 +223,22 @@ namespace GeoCoordinateParser
                     {
                         if (!String.IsNullOrEmpty(matches[4]))
                         {
-                            latMins = double.Parse(matches[4]);
+                            latMins = double.Parse(matches[4].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[6]))
                         {
-                            latSecs = double.Parse(matches[6]);
+                            latSecs = double.Parse(matches[6].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[12]))
                         {
-                            lngMins = double.Parse(matches[12]);
+                            lngMins = double.Parse(matches[12].Replace(",", "."));
                         }
 
                         if (!String.IsNullOrEmpty(matches[14]))
                         {
-                            lngSecs = double.Parse(matches[14]);
+                            lngSecs = double.Parse(matches[14].Replace(",", "."));
                         }
                     }
                     catch
@@ -272,7 +275,6 @@ namespace GeoCoordinateParser
             //double check longitude
             try
             {
-
                 double val = double.Parse(ddLngStr.Replace(",", ".")); //we need the replace because this is verbatim and might have the comma
                 if (val >= 180)
                 {
@@ -286,7 +288,6 @@ namespace GeoCoordinateParser
 
             //lets calculate now
            
-
             try
             {
                 ddLat = Math.Round(double.Parse(ddLatStr.Replace(",", ".")), 6); //replace needed as this is verbatim and may include comma
@@ -304,6 +305,17 @@ namespace GeoCoordinateParser
             //and back to numbers again
             ddLat = double.Parse(ddLatStr);
             ddLng = double.Parse(ddLngStr);
+
+
+            //check the directions, we need both or none
+            if((!String.IsNullOrEmpty(latdir) || !String.IsNullOrEmpty(lngdir)) && (String.IsNullOrEmpty(latdir) || String.IsNullOrEmpty(lngdir))) {
+                throw new Exception("invalid coordinates format");
+            }
+
+            if(!String.IsNullOrEmpty(latdir) && latdir == lngdir)
+            {
+                throw new Exception("invalid coordinates format");
+            }
 
             //make sure the signs and cardinal directions are correct
             if (Regex.IsMatch(latdir, "S|SOUTH", RegexOptions.IgnoreCase))
@@ -413,7 +425,14 @@ namespace GeoCoordinateParser
 
         private static bool checkMatch(string[] matches)
         {
-            //remove blanks
+            //check the first one is not a number, it should be a string (it's the full match)
+            double p;
+            if (double.TryParse(matches[0], out p))
+            {
+                return false;
+            }
+            
+            //remove blanks and shift
             string[] filteredMatch = matches.Where(x => !String.IsNullOrEmpty(x)).ToArray();
             filteredMatch = filteredMatch.Skip(1).ToArray(); //this is shift()
 
@@ -422,32 +441,28 @@ namespace GeoCoordinateParser
             {
                 return false;
             }
+
             //make sure that if it's a number one side it's a number on the other
             int halflen = filteredMatch.Length / 2;
-            decimal parse;
+            Regex numRegex = new Regex(@"^[-+]?\d+([\.,]\d+)?$");
+            Regex dirsRegex = new Regex(@"[eastsouthnorthwest]+", RegexOptions.IgnoreCase);
+
             for (int i = 0; i < halflen; i++)
             {
-                //numbers first
-                if (decimal.TryParse(filteredMatch[i], out parse))
+                string leftside = filteredMatch[i];
+                string rightside = filteredMatch[i + halflen];
+                bool bothNumberic = numRegex.IsMatch(leftside) && numRegex.IsMatch(rightside);
+                bool bothDirs = dirsRegex.IsMatch(leftside) && dirsRegex.IsMatch(rightside);
+                bool bothEqual = leftside == rightside;
+                if(bothNumberic || bothDirs || bothEqual)
                 {
-                    if (!decimal.TryParse(filteredMatch[i + halflen], out parse))
-                    {
-                        return false;
-                    }
+                    continue;
                 }
-            }
-
-            //and same for the second half
-            for (int i = halflen; i < filteredMatch.Length; i++)
-            {
-                //numbers first
-                if (decimal.TryParse(filteredMatch[i], out parse))
+                else
                 {
-                    if (!decimal.TryParse(filteredMatch[i - halflen], out parse))
-                    {
-                        return false;
-                    }
+                    return false;
                 }
+                
             }
 
             return true;
@@ -455,12 +470,12 @@ namespace GeoCoordinateParser
         }
         
         
-        private static Regex dd_re = new Regex(@"(NORTH|SOUTH|[NS])?[\s]*([+-]?[0-8]?[0-9](?:[\.,]\d{3,}))([•º°]?)[\s]*(NORTH|SOUTH|[NS])?[\s]*[,/]?[\s]*(EAST|WEST|[EW])?[\s]*([+-]?[0-1]?[0-9]?[0-9](?:[\.,]\d{3,}))([•º°]?)[\s]*(EAST|WEST|[EW])?", RegexOptions.IgnoreCase);
+        private static Regex dd_re = new Regex(@"(NORTH|SOUTH|[NS])?\s*([+-]?[0-8]?[0-9](?:[\.,]\d{3,}))\s*([•º°]?)[\s]*(NORTH|SOUTH|[NS])?\s*[,/;]?[\s]*(EAST|WEST|[EW])?\s*([+-]?[0-1]?[0-9]?[0-9](?:[\.,]\d{3,}))\s*([•º°]?)\s*(EAST|WEST|[EW])?", RegexOptions.IgnoreCase);
 
-        private static Regex dms_periods = new Regex(@"(NORTH|SOUTH|[NS])?[\ \t]*([+-]?[0-8]?[0-9])[\ \t]*(\.)[\ \t]*([0-5]?[0-9])[\ \t]*(\.)?[\ \t]*((?:[0-5]?[0-9])(?:\.\d{1,3})?)?(NORTH|SOUTH|[NS])?(?:[\ \t]*[,/][\ \t]*|[\ \t]*)(EAST|WEST|[EW])?[\ \t]*([+-]?[0-1]?[0-9]?[0-9])[\ \t]*(\.)[\ \t]*([0-5]?[0-9])[\ \t]*(\.)?[\ \t]*((?:[0-5]?[0-9])(?:\.\d{1,3})?)?(EAST|WEST|[EW])?", RegexOptions.IgnoreCase);
+        private static Regex dms_periods = new Regex(@"(NORTH|SOUTH|[NS])?\s*([+-]?[0-8]?[0-9])\s*(\.)\s*([0-5]?[0-9])\s*(\.)\s*((?:[0-5]?[0-9])(?:[\.,]{1}\d{1,3})?)?\s*(NORTH|SOUTH|[NS])?(?:\s*[,/;]\s*|\s*)(EAST|WEST|[EW])?\s*([+-]?[0-1]?[0-9]?[0-9])\s*(\.)\s*([0-5]?[0-9])\s*(\.)\s*((?:[0-5]?[0-9])(?:[\.,]{1}\d{1,3})?)?\s*(EAST|WEST|[EW])?", RegexOptions.IgnoreCase);
 
-        private static Regex dms_abbr = new Regex(@"(NORTH|SOUTH|[NS])?[\ \t]*([+-]?[0-8]?[0-9])[\ \t]*(D(?:EG)?(?:REES)?)[\ \t]*([0-5]?[0-9])[\ \t]*(M(?:IN)?(?:UTES)?)[\ \t]*((?:[0-5]?[0-9])(?:\.\d{1,3})?)?(S(?:EC)?(?:ONDS)?)?[\ \t]*(NORTH|SOUTH|[NS])?(?:[\ \t]*[,/][\ \t]*|[\ \t]*)(EAST|WEST|[EW])?[\ \t]*([+-]?[0-1]?[0-9]?[0-9])[\ \t]*(D(?:EG)?(?:REES)?)[\ \t]*([0-5]?[0-9])[\ \t]*(M(?:IN)?(?:UTES)?)[\ \t]*((?:[0-5]?[0-9])(?:\.\d{1,3})?)?(S(?:EC)?(?:ONDS)?)[\ \t]*(EAST|WEST|[EW])?", RegexOptions.IgnoreCase);
+        private static Regex dms_abbr = new Regex(@"(NORTH|SOUTH|[NS])?\s*([+-]?[0-8]?[0-9])\s*(D(?:EG)?(?:REES)?)\s*([0-5]?[0-9])\s*(M(?:IN)?(?:UTES)?)\s*((?:[0-5]?[0-9])(?:[\.,]{1}\d{1,3})?)?(S(?:EC)?(?:ONDS)?)?\s*(NORTH|SOUTH|[NS])?(?:\s*[,/;]\s*|\s*)(EAST|WEST|[EW])?\s*([+-]?[0-1]?[0-9]?[0-9])\s*(D(?:EG)?(?:REES)?)\s*([0-5]?[0-9])\s*(M(?:IN)?(?:UTES)?)\s*((?:[0-5]?[0-9])(?:[\.,]{1}\d{1,3})?)?(S(?:EC)?(?:ONDS)?)\s*(EAST|WEST|[EW])?", RegexOptions.IgnoreCase);
 
-        private static Regex coords_other = new Regex(@"(NORTH|SOUTH|[NS])?[\ \t]*([+-]?[0-8]?[0-9])[\ \t]*([•º°\.:]|D(?:EG)?(?:REES)?)?[\ \t]*,?([0-5]?[0-9](?:\.\d{1,})?)?[\ \t]*(['′´’\.:]|M(?:IN)?(?:UTES)?)?[\ \t]*,?((?:[0-5]?[0-9])(?:\.\d{1,3})?)?[\ \t]*(''|′′|’’|´´|[""″”\.])?[\ \t]*(NORTH|SOUTH|[NS])?(?:[\ \t]*[,/][\ \t]*|[\ \t]*)(EAST|WEST|[EW])?[\ \t]*([+-]?[0-1]?[0-9]?[0-9])[\ \t]*([•º°\.:]|D(?:EG)?(?:REES)?)?[\ \t]*,?([0-5]?[0-9](?:\.\d{1,})?)?[\ \t]*(['′´’\.:]|M(?:IN)?(?:UTES)?)?[\ \t]*,?((?:[0-5]?[0-9])(?:\.\d{1,3})?)?[\ \t]*(''|′′|´´|’’|[""″”\.])?[\ \t]*(EAST|WEST|[EW])?", RegexOptions.IgnoreCase); //just have to double up the " from the javascript version
+        private static Regex coords_other = new Regex(@"(NORTH|SOUTH|[NS])?\s*([+-]?[0-8]?[0-9])\s*([•º°\.:]|D(?:EG)?(?:REES)?)?\s*,?([0-5]?[0-9](?:[\.,]\d{1,})?)?\s*(['′´’\.:]|M(?:IN)?(?:UTES)?)?\s*,?((?:[0-5]?[0-9])(?:[\.,]\d{1,3})?)?\s*(''|′′|’’|´´|[""″”\.])?\s*(NORTH|SOUTH|[NS])?(?:\s*[,/;]\s*|\s*)(EAST|WEST|[EW])?\s*([+-]?[0-1]?[0-9]?[0-9])\s*([•º°\.:]|D(?:EG)?(?:REES)?)?\s*,?([0-5]?[0-9](?:[\.,]\d{1,})?)?\s*(['′´’\.:]|M(?:IN)?(?:UTES)?)?\s*,?((?:[0-5]?[0-9])(?:[\.,]\d{1,3})?)?\s*(''|′′|´´|’’|[""″”\.])?\s*(EAST|WEST|[EW])?", RegexOptions.IgnoreCase); //just have to double up the " from the javascript version
     }
 }

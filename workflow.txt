@@ -1,0 +1,18 @@
+# see https://stackoverflow.com/a/60934458/3210158 for generating the certificate
+# Build the project, then in Developer Powershell do the following:
+
+$EKU = "2.5.29.37"
+$EKU_CODE_SIGNING = "1.3.6.1.5.5.7.3.3"
+
+$certificate = New-SelfSignedCertificate -Subject "CN=Code Sign CoordsParser,E=ian@nscf.org.za,O=Natural Science Collections Facility" `
+                          -FriendlyName "Self Signed Certificate for GeoCoordsParser" `
+                          -NotAfter (Get-Date).AddYears(20) `
+                          -CertStoreLocation Cert:\CurrentUser\My `
+                          -TextExtension @("$EKU={text}$EKU_CODE_SIGNING")
+
+$password = ConvertTo-SecureString -String "InsertPasswordHere" -Force -AsPlainText
+
+Export-PfxCertificate -Cert "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -FilePath "GeoCoordinateParser/codesigning.pfx" -Password $password
+
+#then sign
+SignTool sign /f GeoCoordinateParser/codesigning.pfx /p InsertPasswordHere GeoCoordinateParser/bin/Release/GeoCoordinateParser.dll
